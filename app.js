@@ -46,13 +46,8 @@ async function searchYouTube(query) {
 // Función para obtener la URL del stream de audio (preferiblemente M4A) usando @distube/ytdl-core
 async function getYouTubeAudioUrl(videoUrl) {
   try {
-    const info = await ytdl.getInfo(videoUrl, {
-      requestOptions: {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"
-        }
-      }
-    });
+    const agent = ytdl.createProxyAgent({ uri: "https://2d92-5-189-145-148.ngrok-free.app" });
+    const info = await ytdl.getInfo(videoUrl, { agent });
     console.log("Información del video obtenido:", info.videoDetails.title);
     // Filtrar formatos: que tengan audio y sean de formato M4A o contengan "audio/mp4"
     const audioFormats = info.formats.filter(fmt => {
