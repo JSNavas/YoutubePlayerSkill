@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
-// Usamos youtube-dl-exec en lugar de @distube/ytdl-core
 const youtubedl = require('youtube-dl-exec');
 
 const app = express();
@@ -54,10 +53,11 @@ async function getYouTubeAudioUrl(videoUrl) {
       dumpSingleJson: true,
       noWarnings: true,
       format: 'bestaudio',
-      // Pasa la ruta de tu archivo de cookies
+      // Pasa la ruta de tu archivo de cookies exportadas desde el navegador con la extensión de cookies.txt
       cookies: './cookies.txt'
     });
-    console.log("Output completo:", JSON.stringify(output, null, 2));
+
+    console.log("Información del video obtenido:", output.title);
     
     // Filtra los formatos que tengan audio y sean compatibles (preferiblemente M4A)
     const audioFormats = output.formats.filter(fmt => {
@@ -70,7 +70,7 @@ async function getYouTubeAudioUrl(videoUrl) {
       // Ordena por bitrate (abr) de forma descendente
       audioFormats.sort((a, b) => (b.abr || 0) - (a.abr || 0));
       const chosenFormat = audioFormats[0];
-      console.log("Formato de audio elegido:", chosenFormat);
+      console.log("Formato de audio elegido:", chosenFormat.itag, chosenFormat.mimeType, chosenFormat.abr);
       return chosenFormat.url;
     }
     console.error("No se encontraron formatos de audio compatibles.");
