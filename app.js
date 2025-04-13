@@ -3,7 +3,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 const ytdl = require('@distube/ytdl-core');
-const { getRandomIPv6 } = require("@distube/ytdl-core/lib/utils");
 
 const app = express();
 app.use(bodyParser.json());
@@ -47,11 +46,10 @@ async function searchYouTube(query) {
 // Función para obtener la URL del stream de audio (preferiblemente M4A) usando @distube/ytdl-core
 async function getYouTubeAudioUrl(videoUrl) {
   try {
-    const agentForAnotherRandomIP = ytdl.createAgent(undefined, {
-      localAddress: getRandomIPv6("2001:2::/48"),
-    });
+    const agent = ytdl.createProxyAgent({ uri: "https://2d92-5-189-145-148.ngrok-free.app" });
 
-    const info = await ytdl.getInfo(videoUrl, { agent: agentForAnotherRandomIP });
+    const info = await ytdl.getInfo(videoUrl, { agent });
+    
     console.log("Información del video obtenido:", info.videoDetails.title);
     // Filtrar formatos: que tengan audio y sean de formato M4A o contengan "audio/mp4"
     const audioFormats = info.formats.filter(fmt => {
