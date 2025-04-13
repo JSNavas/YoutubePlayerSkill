@@ -50,16 +50,16 @@ async function searchYouTube(query) {
 // Función para obtener la URL del stream de audio (preferiblemente M4A) usando youtube-dl-exec
 async function getYouTubeAudioUrl(videoUrl) {
   try {
-    // Llama a youtube-dl-exec para obtener la información del video en formato JSON
     const output = await youtubedl(videoUrl, {
       dumpSingleJson: true,
       noWarnings: true,
-      format: 'bestaudio'
+      format: 'bestaudio',
+      // Pasa la ruta de tu archivo de cookies
+      cookies: './cookies.txt'
     });
     console.log("Output completo:", JSON.stringify(output, null, 2));
     
-    // Filtra los formatos que tengan audio y sean compatibles:
-    // Preferimos aquellos con extensión "m4a" o cuyo mimeType incluya "audio/mp4"
+    // Filtra los formatos que tengan audio y sean compatibles (preferiblemente M4A)
     const audioFormats = output.formats.filter(fmt => {
       const tieneAcodec = fmt.acodec && fmt.acodec !== 'none';
       const esMp4 = fmt.ext === 'm4a' || (fmt.mimeType && fmt.mimeType.includes("audio/mp4"));
@@ -67,7 +67,7 @@ async function getYouTubeAudioUrl(videoUrl) {
     });
     
     if (audioFormats && audioFormats.length > 0) {
-      // Ordena los formatos por bitrate de audio (abr) de forma descendente
+      // Ordena por bitrate (abr) de forma descendente
       audioFormats.sort((a, b) => (b.abr || 0) - (a.abr || 0));
       const chosenFormat = audioFormats[0];
       console.log("Formato de audio elegido:", chosenFormat);
@@ -80,6 +80,7 @@ async function getYouTubeAudioUrl(videoUrl) {
     return null;
   }
 }
+
 
 // Endpoint proxy para retransmitir el contenido de audio y agregar los encabezados necesarios para Alexa
 app.get('/proxy', async (req, res) => {
