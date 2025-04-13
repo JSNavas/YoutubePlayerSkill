@@ -70,7 +70,7 @@ async function getYouTubeAudioUrl(videoUrl) {
       // Ordena por bitrate (abr) de forma descendente
       audioFormats.sort((a, b) => (b.abr || 0) - (a.abr || 0));
       const chosenFormat = audioFormats[0];
-      console.log("Formato de audio elegido:", chosenFormat.itag, chosenFormat.mimeType, chosenFormat.abr);
+      console.log("Formato de audio elegido:", chosenFormat);
       return chosenFormat.url;
     }
     console.error("No se encontraron formatos de audio compatibles.");
