@@ -1,0 +1,61 @@
+{
+    "interactionModel": {
+        "languageModel": {
+            "invocationName": "youtube player",
+            "intents": [
+                {
+                    "name": "AMAZON.CancelIntent",
+                    "samples": [
+                        "cancela",
+                        "cancela la reproduccion"
+                    ]
+                },
+                {
+                    "name": "AMAZON.HelpIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.StopIntent",
+                    "samples": [
+                        "para"
+                    ]
+                },
+                {
+                    "name": "AMAZON.NavigateHomeIntent",
+                    "samples": []
+                },
+                {
+                    "name": "PlayYouTubeIntent",
+                    "slots": [
+                        {
+                            "name": "videoQuery",
+                            "type": "AMAZON.SearchQuery"
+                        }
+                    ],
+                    "samples": [
+                        "pon {videoQuery}",
+                        "reproduce {videoQuery}",
+                        "pon {videoQuery} en youtube",
+                        "reproduce {videoQuery} en youtube"
+                    ]
+                },
+                {
+                    "name": "ChangeSongIntent",
+                    "slots": [],
+                    "samples": [
+                        "cambiar la canción"
+                    ]
+                },
+                {
+                    "name": "AMAZON.PauseIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.ResumeIntent",
+                    "samples": []
+                }
+            ],
+            "types": []
+        }
+    }
+}

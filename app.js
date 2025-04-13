@@ -8,7 +8,7 @@ const app = express();
 app.use(bodyParser.json());
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
-const PROXY_BASE_URL = process.env.PROXY_BASE_URL || "https://abcd1234.ngrok.io";
+const PROXY_BASE_URL = process.env.PROXY_BASE_URL;
 
 // Variable global para almacenar el estado de reproducción
 let playbackState = {
