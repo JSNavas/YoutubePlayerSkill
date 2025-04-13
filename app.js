@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
-const ytdl = require('@distube/ytdl-core');
+// Usamos youtube-dl-exec en lugar de @distube/ytdl-core
+const youtubedl = require('youtube-dl-exec');
 
 const app = express();
 app.use(bodyParser.json());
@@ -18,19 +19,22 @@ let playbackState = {
   videoQuery: ""
 };
 
+// Función para generar un UUID (para token único)
 function uuidv4() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    let r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
 
-// Función para buscar un video en YouTube por nombre
+// Función para buscar un video en YouTube por nombre utilizando la YouTube Data API v3
 async function searchYouTube(query) {
   const apiKey = YOUTUBE_API_KEY;
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=${encodeURIComponent(query)}&key=${apiKey}`;
   try {
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
     if (response.data.items && response.data.items.length > 0) {
       const videoId = response.data.items[0].id.videoId;
       return `https://www.youtube.com/watch?v=${videoId}`;
@@ -38,38 +42,46 @@ async function searchYouTube(query) {
       return null;
     }
   } catch (error) {
-    console.error("Error buscando en YouTube:", error);
+    console.error("Error buscando en YouTube:", error.response?.data || error);
     return null;
   }
 }
 
-// Función para obtener la URL del stream de audio (preferiblemente M4A) usando @distube/ytdl-core
+// Función para obtener la URL del stream de audio (preferiblemente M4A) usando youtube-dl-exec
 async function getYouTubeAudioUrl(videoUrl) {
   try {
-    const info = await ytdl.getInfo(videoUrl);
-    console.log("Información del video obtenido:", info.videoDetails.title);
-    // Filtrar formatos: que tengan audio y sean de formato M4A o contengan "audio/mp4"
-    const audioFormats = info.formats.filter(fmt => {
-      const tieneAcodec = fmt.hasAudio || (fmt.acodec && fmt.acodec !== 'none');
+    // Llama a youtube-dl-exec para obtener la información del video en formato JSON
+    const output = await youtubedl(videoUrl, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      format: 'bestaudio'
+    });
+    console.log("Output completo:", JSON.stringify(output, null, 2));
+    
+    // Filtra los formatos que tengan audio y sean compatibles:
+    // Preferimos aquellos con extensión "m4a" o cuyo mimeType incluya "audio/mp4"
+    const audioFormats = output.formats.filter(fmt => {
+      const tieneAcodec = fmt.acodec && fmt.acodec !== 'none';
       const esMp4 = fmt.ext === 'm4a' || (fmt.mimeType && fmt.mimeType.includes("audio/mp4"));
       return tieneAcodec && esMp4;
     });
+    
     if (audioFormats && audioFormats.length > 0) {
-      // Ordenar los formatos por bitrate (abr) de forma descendente
+      // Ordena los formatos por bitrate de audio (abr) de forma descendente
       audioFormats.sort((a, b) => (b.abr || 0) - (a.abr || 0));
       const chosenFormat = audioFormats[0];
-      console.log("Formato de audio elegido:", chosenFormat.itag, chosenFormat.mimeType, chosenFormat.abr);
+      console.log("Formato de audio elegido:", chosenFormat);
       return chosenFormat.url;
     }
     console.error("No se encontraron formatos de audio compatibles.");
     return null;
   } catch (error) {
-    console.error("Error extrayendo audio con @distube/ytdl-core:", error);
+    console.error("Error extrayendo audio con youtube-dl-exec:", error);
     return null;
   }
 }
 
-// Endpoint proxy para retransmitir el contenido de audio y agregar headers necesarias para reproducir en Alexa
+// Endpoint proxy para retransmitir el contenido de audio y agregar los encabezados necesarios para Alexa
 app.get('/proxy', async (req, res) => {
   try {
     const targetUrl = req.query.url;
@@ -96,14 +108,15 @@ app.post('/alexa', async (req, res) => {
         response: {
           outputSpeech: {
             type: "PlainText",
-            text: "Bienvenido a YouTube Player Skill. Dime el nombre de la cancion que quieres escuchar."
+            text: "Bienvenido a YouTube Player Skill. Dime el nombre de la canción que quieres escuchar."
           },
           shouldEndSession: false
         }
       };
     } else if (requestType === 'IntentRequest') {
       const intentName = req.body.request.intent.name;
-      // Manejo de PlayYouTubeIntent: busca y reproduce nueva canción
+      
+      // Intent para reproducir una canción (PlayYouTubeIntent)
       if (intentName === 'PlayYouTubeIntent') {
         const videoQuery = req.body.request.intent.slots.videoQuery.value;
         const videoUrl = await searchYouTube(videoQuery);
@@ -132,14 +145,14 @@ app.post('/alexa', async (req, res) => {
               }
             };
           } else {
-            // Genera un token único y actualiza el estado de reproducción
+            // Actualiza el estado de reproducción con un token único
             playbackState.token = uuidv4();
             playbackState.url = audioUrl;
-            playbackState.offsetInMilliseconds = 0; // Reinicia a 0 para una nueva canción
+            playbackState.offsetInMilliseconds = 0; // Nueva canción, reinicia el offset
             playbackState.videoQuery = videoQuery;
             
+            // Construye el URL del proxy
             const proxyUrl = `${PROXY_BASE_URL}/proxy?url=${encodeURIComponent(audioUrl)}`;
-
             responseJson = {
               version: "1.0",
               response: {
@@ -171,8 +184,9 @@ app.post('/alexa', async (req, res) => {
           }
         }
       }
-      else if(intentName === 'ChangeSongIntent') {
-        // Respuesta para cambiar de canción
+      // Intent para cambiar de canción (ChangeSongIntent)
+      else if (intentName === 'ChangeSongIntent') {
+        // Responde con un outputSpeech preguntando por la nueva canción; deja la sesión abierta
         responseJson = {
           version: "1.0",
           response: {
@@ -184,10 +198,8 @@ app.post('/alexa', async (req, res) => {
           }
         };
       }
-      // Manejo de AMAZON.PauseIntent: detener la reproducción
+      // Intent para pausar la reproducción
       else if (intentName === 'AMAZON.PauseIntent' || intentName === 'AMAZON.StopIntent') {
-        // simplemente detenemos la reproducción.
-        // Nota: Para una verdadera funcionalidad de pausa/resume se requeriría capturar el offset
         responseJson = {
           version: "1.0",
           response: {
@@ -204,7 +216,7 @@ app.post('/alexa', async (req, res) => {
           }
         };
       }
-      // Manejo de AMAZON.ResumeIntent: reanudar la reproducción desde el offset guardado
+      // Intent para reanudar la reproducción
       else if (intentName === 'AMAZON.ResumeIntent') {
         if (playbackState.url) {
           const proxyUrl = `${PROXY_BASE_URL}/proxy?url=${encodeURIComponent(playbackState.url)}`;
@@ -221,9 +233,9 @@ app.post('/alexa', async (req, res) => {
                   playBehavior: "REPLACE_ALL",
                   audioItem: {
                     stream: {
-                      token: playbackState.token, // utilizamos el mismo token
+                      token: playbackState.token,
                       url: proxyUrl,
-                      offsetInMilliseconds: playbackState.offsetInMilliseconds // si se hubiera guardado el offset
+                      offsetInMilliseconds: playbackState.offsetInMilliseconds
                     }
                   }
                 }
@@ -244,7 +256,7 @@ app.post('/alexa', async (req, res) => {
           };
         }
       }
-      // Manejo para Cancelar o Detener la skill
+      // Intent para cancelar la skill
       else if (intentName === 'AMAZON.CancelIntent') {
         responseJson = {
           version: "1.0",
@@ -262,7 +274,7 @@ app.post('/alexa', async (req, res) => {
           }
         };
       }
-      // Otros intents o fallback
+      // Fallback para intents no reconocidos
       else {
         responseJson = {
           version: "1.0",
